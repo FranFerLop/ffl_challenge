@@ -18,7 +18,7 @@ stages:
   - job: Build
     displayName: Build
     pool:
-      vmImage: 'Default' # Using a local agent running in Docker
+      name: 'Default' # Using a local agent running in Docker
     steps:
     - task: Docker@2
       displayName: Build an image
