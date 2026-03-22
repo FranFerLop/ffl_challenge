@@ -25,6 +25,8 @@ stages:
       inputs:
         method: 'install'
         version: 'latest'
+        type: 'filesystem'
+        target: '$(Build.SourcesDirectory)'
         scanners: 'misconfig, secret, vuln'
         severities: 'CRITICAL'
         failOnSeverityThreshold: 'CRITICAL'
