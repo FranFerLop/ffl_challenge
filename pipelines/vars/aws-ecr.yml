@@ -1,0 +1,6 @@
+variables:
+  - group: 'AWS-ECR-variables'
+  - name: aws_connection
+    value: '$(AWS_ECR_CONNECTION)'
+  - name: aws_repo
+    value: $(AWS_ECR_REPOSITORY)
