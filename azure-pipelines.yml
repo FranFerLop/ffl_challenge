@@ -18,25 +18,19 @@ stages:
 - stage: SecurityScan
   displayName: Security Scan
   jobs:
-  - job: OwaspDependencyCheck
-    displayName: OWASP Dependency Check job
+  - job: TrivySecurityScan
+    displayName: Trivy Security Scan job
     steps:
-    - task: Maven@4
-      displayName: Run OWASP Dependency Check
+    - task: trivy@2
       inputs:
-        mavenPomFile: 'pom.xml'
-        goals: 'dependency-check:check'
-        options: >
-          -Ddependency-check.failBuildOnCVSS=7
-          -Ddependency-check.format=HTML
-          -Ddependency-check.outputDirectory=$(Build.ArtifactStagingDirectory)/dependency-check
-
-    - task: PublishBuildArtifacts@1
-      displayName: Publish Dependency Check Report
-      condition: always()  # publicar el informe aunque el pipeline falle
-      inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)/dependency-check'
-        ArtifactName: 'dependency-check-report'
+        method: 'system'
+        type: 'filesystem'
+        target: '.'
+        scanners: 'misconfig, secret, vuln'
+        severities: 'CRITICAL'
+        failOnSeverityThreshold: 'CRITICAL'
+        reports: 'html'
+        publish: true
 
 - stage: Build
   displayName: Build image
