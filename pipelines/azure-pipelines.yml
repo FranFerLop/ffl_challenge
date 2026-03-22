@@ -1,0 +1,88 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- master
+
+pool:
+  name: 'Default' # Using a local agent running in Docker
+
+resources:
+- repo: self
+
+parameters:
+- name: deploy_to_aws
+  type: boolean
+  default: false
+
+variables: 
+- template: vars/common.yml
+- template: vars/dockerhub.yml
+- ${{ if eq(parameters.deploy_to_aws, true) }}:
+  - template: vars/aws-ecr.yml
+
+stages:
+- stage: SecurityScan
+  displayName: Security Scan
+  jobs:
+  - job: TrivySecurityScan
+    displayName: Trivy Security Scan job
+    steps:
+    - task: trivy@2
+      inputs:
+        method: 'install'
+        version: 'latest'
+        type: 'filesystem'
+        target: '$(Build.SourcesDirectory)'
+        scanners: 'misconfig'
+        severities: 'CRITICAL'
+        failOnSeverityThreshold: 'CRITICAL'
+        reports: 'html'
+        publish: true
+
+- stage: BuildAndPush
+  displayName: Build And Push image
+  jobs:
+  - job: BuildAndPushJob
+    displayName: Build and Push image job
+    steps:
+    # Push to DockerHub
+    - template: templates/docker-push.yml
+      parameters:
+        serviceConnection: $(dh_connection) # Defined in vars/dockerhub.yml
+        repositoryName: $(dh_repository)    # Defined in vars/dockerhub.yml
+        imageTag: '$(tag)'                  # Defined in vars/common.yml
+
+    # Push to AWS
+    - ${{ if eq(parameters.deploy_to_aws, true) }}:
+      - template: templates/docker-push.yml
+        parameters:
+          serviceConnection: $(aws_connection) # Defined in vars/aws-ecr.yml
+          repositoryName: $(aws_repo)          # Defined in vars/aws-ecr.yml
+          imageTag: '$(tag)'
+
+- stage: Sign
+  displayName: Sign image with Cosign
+  dependsOn: BuildAndPush
+  jobs:
+  - job: SignImage
+    displayName: Cosign sign
+    steps:
+    # Sign the image pushed to DockerHub
+    - template: templates/cosign-sign.yml
+      parameters:
+        imageName: $(dh_repository) # Defined in vars/dockerhub.yml
+        tag: '$(tag)'               # Defined in vars/common.yml
+        imageDigest: "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+        to_aws: false
+    
+    # Sign the image pushed to AWS
+    - ${{ if eq(parameters.deploy_to_aws, true) }}:
+      - template: templates/cosign-sign.yml
+        parameters:
+          imageName: $(aws_repo)          # Defined in vars/aws-ecr.yml
+          tag: '$(tag)'                   # Defined in vars/common.yml
+          imageDigest: "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+          to_aws: true
+        

@@ -1,0 +1,32 @@
+parameters:
+  - name: imageName
+    type: string
+  - name: tag
+    type: string
+  - name: imageDigest
+    type: string
+  - name: to_aws
+    type: boolean
+    default: false
+
+steps:
+# - task: AWSShellScript@1
+#   displayName: ECR Login for Cosign
+#   condition: eq(variables['to_aws'], 'true')
+#   inputs:
+#     awsCredentials: $(aws_connection)
+#     regionName: $(awsRegion)
+#     scriptType: inline
+#     inlineScript: |
+#       aws ecr get-login-password --region $(awsRegion) | \
+#         docker login --username AWS --password-stdin $(awsEcrRegistry)
+
+- bash: |
+    cosign sign \
+      --key env://COSIGN_PRIVATE_KEY \
+      --yes \
+      ${{ parameters.imageName }}@${{ parameters.imageDigest }}
+  displayName: 'Sign container image with Cosign'
+  env:
+    COSIGN_PRIVATE_KEY: $(COSIGN_PRIVATE_KEY)
+    COSIGN_PASSWORD: $(COSIGN_PASSWORD)

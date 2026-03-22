@@ -1,0 +1,8 @@
+variables:
+  - group: 'Cosign-variables'
+  - name: cosing_pub
+    value: |
+      -----BEGIN PUBLIC KEY-----
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAET66b8vNcTOQ/YXnMPeanivq+rpU3
+      vQsqyO9jj6K5GcR+tY9pvnmaYvu/vDVuyZNTgNJ5i0S4a2Ya8778RMXDcA==
+      -----END PUBLIC KEY-----

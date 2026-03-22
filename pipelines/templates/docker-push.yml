@@ -1,0 +1,28 @@
+parameters:
+- name: serviceConnection
+  type: string
+- name: repositoryName
+  type: string
+- name: imageTag
+  default: 'latest'
+
+steps:
+- task: Docker@2
+  displayName: 'Pushing to ${{ parameters.repositoryName }}'
+  inputs:
+    command: 'buildAndPush'
+    dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+    containerRegistry: ${{ parameters.serviceConnection }}
+    repository: ${{ parameters.repositoryName }}
+    tags: |
+      ${{ parameters.imageTag }}
+
+- bash: |
+    # Extract digest from Docker@2 task output
+    DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${{ parameters.repositoryName }}:${{ parameters.imageTag }}")
+    echo "Image Digest: $DIGEST"
+    
+    # Exporting the image digest as output variable
+    echo "##vso[task.setvariable variable=imageDigest;isOutput=true]$DIGEST"
+  displayName: Extract image digest
+  name: extractDigest
