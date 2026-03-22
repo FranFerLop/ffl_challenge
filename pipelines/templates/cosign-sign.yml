@@ -5,7 +5,8 @@ parameters:
     type: string
 
 steps:
-  - script: |
+- script: |
+    # Usar comillas para evitar problemas con saltos de línea de la clave
     echo "$(COSIGN_PRIVATE_KEY)" > /tmp/cosign.key
 
     cosign sign \
@@ -14,7 +15,6 @@ steps:
       ${{ parameters.imageName }}:${{ parameters.tag }}
 
     rm /tmp/cosign.key
-
-  displayName: Sign container image
+  displayName: 'Sign container image'
   env:
     COSIGN_PASSWORD: $(COSIGN_PASSWORD)
