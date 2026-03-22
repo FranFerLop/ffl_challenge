@@ -15,6 +15,24 @@ variables:
   tag: '$(Build.BuildId)'
 
 stages:
+- stage: SecurityScan
+  displayName: Security Scan
+  jobs:
+  - job: TrivySecurityScan
+    displayName: Trivy Security Scan job
+    steps:
+    - task: trivy@2
+      inputs:
+        method: 'install'
+        version: 'latest'
+        type: 'filesystem'
+        target: '$(Build.SourcesDirectory)'
+        scanners: 'misconfig'
+        severities: 'CRITICAL'
+        failOnSeverityThreshold: 'CRITICAL'
+        reports: 'html'
+        publish: true
+
 - stage: Build
   displayName: Build image
   jobs:
