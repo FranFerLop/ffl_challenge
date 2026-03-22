@@ -16,3 +16,13 @@ steps:
     repository: ${{ parameters.repositoryName }}
     tags: |
       ${{ parameters.imageTag }}
+
+- script: |
+    # Taking the image Digest from the output of the Docker@2 task
+    DIGEST=$(cat $(Pipeline.Workspace)/${{ parameters.serviceConnection }}/${{ parameters.repositoryName }}/digest)
+    echo "Image Digest: $DIGEST"
+
+    # Exporting the image digest as output
+    echo "##vso[task.setvariable variable=imageDigest;isOutput=true]$DIGEST"
+  displayName: Extract image digest
+  name: extractDigest

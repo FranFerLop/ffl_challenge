@@ -74,11 +74,13 @@ stages:
       parameters:
         imageName: $(dh_repository) # Defined in vars/dockerhub.yml
         tag: '$(tag)'               # Defined in vars/common.yml
+        to_aws: false
     
     # Sign the image pushed to AWS
     - ${{ if eq(parameters.deploy_to_aws, true) }}:
       - template: templates/cosign-sign.yml
         parameters:
           imageName: $(aws_repo)          # Defined in vars/aws-ecr.yml
-          imageTag: '$(tag)'              # Defined in vars/common.yml
+          tag: '$(tag)'                   # Defined in vars/common.yml
+          to_aws: true
         
