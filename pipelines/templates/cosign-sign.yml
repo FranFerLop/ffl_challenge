@@ -3,19 +3,18 @@ parameters:
     type: string
   - name: tag
     type: string
+  - name: imageDigest
+    type: string
   - name: to_aws
     type: boolean
     default: false
-
-variables:
-  - imageDigest: $[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]
 
 steps:
 - task: AWSShellScript@1
   displayName: ECR Login for Cosign
   condition: eq(variables['to_aws'], 'true')
   inputs:
-    awsCredentials: $(awsConnection)   # <-- aquí sí usas el Service Connection
+    awsCredentials: $(awsConnection)
     regionName: $(awsRegion)
     scriptType: inline
     inlineScript: |
@@ -26,7 +25,7 @@ steps:
     cosign sign \
       --key env://COSIGN_PRIVATE_KEY \
       --yes \
-      ${{ parameters.imageName }}@$(imageDigest)
+      ${{ parameters.imageName }}@${{ parameters.imageDigest }}
   displayName: 'Sign container image with Cosign'
   env:
     COSIGN_PRIVATE_KEY: $(COSIGN_PRIVATE_KEY)

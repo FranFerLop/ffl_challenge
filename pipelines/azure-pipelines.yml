@@ -74,6 +74,7 @@ stages:
       parameters:
         imageName: $(dh_repository) # Defined in vars/dockerhub.yml
         tag: '$(tag)'               # Defined in vars/common.yml
+        imageDigest: $[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]
         to_aws: false
     
     # Sign the image pushed to AWS
@@ -82,5 +83,6 @@ stages:
         parameters:
           imageName: $(aws_repo)          # Defined in vars/aws-ecr.yml
           tag: '$(tag)'                   # Defined in vars/common.yml
+          imageDigest: $[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]
           to_aws: true
         
