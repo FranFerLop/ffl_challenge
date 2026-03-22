@@ -14,7 +14,7 @@ steps:
   displayName: ECR Login for Cosign
   condition: eq(variables['to_aws'], 'true')
   inputs:
-    awsCredentials: $(awsConnection)
+    awsCredentials: $(aws_connection)
     regionName: $(awsRegion)
     scriptType: inline
     inlineScript: |
