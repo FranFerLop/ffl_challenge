@@ -1,3 +1,3 @@
 variables:
   dh_connection: 'SC_DockerHub'
-  dh_repository: '$(DOCKERHUB_REPOSITORY)' # Set in pipeline variables
+  dh_repository: $(DOCKERHUB_REPOSITORY) # Set in pipeline variables
