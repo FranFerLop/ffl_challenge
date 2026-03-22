@@ -10,8 +10,9 @@ steps:
 - task: Docker@2
   displayName: 'Pushing to ${{ parameters.repositoryName }}'
   inputs:
+    command: 'buildAndPush'
+    dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
     containerRegistry: ${{ parameters.serviceConnection }}
     repository: ${{ parameters.repositoryName }}
-    command: 'push'
     tags: |
       ${{ parameters.imageTag }}

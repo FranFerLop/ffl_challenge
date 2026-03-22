@@ -1,6 +1,6 @@
 variables:
   - group: 'DockerHub-variables'
   - name: dh_connection
-    value: 'SC_DockerHub'
+    value: '$(DOCKERHUB_CONNECTION)'
   - name: dh_repository
     value: $(DOCKERHUB_REPOSITORY)
