@@ -10,16 +10,16 @@ parameters:
     default: false
 
 steps:
-- task: AWSShellScript@1
-  displayName: ECR Login for Cosign
-  condition: eq(variables['to_aws'], 'true')
-  inputs:
-    awsCredentials: $(aws_connection)
-    regionName: $(awsRegion)
-    scriptType: inline
-    inlineScript: |
-      aws ecr get-login-password --region $(awsRegion) | \
-        docker login --username AWS --password-stdin $(awsEcrRegistry)
+# - task: AWSShellScript@1
+#   displayName: ECR Login for Cosign
+#   condition: eq(variables['to_aws'], 'true')
+#   inputs:
+#     awsCredentials: $(aws_connection)
+#     regionName: $(awsRegion)
+#     scriptType: inline
+#     inlineScript: |
+#       aws ecr get-login-password --region $(awsRegion) | \
+#         docker login --username AWS --password-stdin $(awsEcrRegistry)
 
 - bash: |
     cosign sign \
