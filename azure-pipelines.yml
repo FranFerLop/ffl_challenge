@@ -25,7 +25,7 @@ stages:
       inputs:
         method: 'system'
         type: 'filesystem'
-        target: '.'
+        target: '$(Build.SourcesDirectory)'
         scanners: 'misconfig, secret, vuln'
         severities: 'CRITICAL'
         failOnSeverityThreshold: 'CRITICAL'
