@@ -23,9 +23,8 @@ stages:
     steps:
     - task: trivy@2
       inputs:
-        method: 'system'
-        type: 'filesystem'
-        target: '$(Build.SourcesDirectory)'
+        method: 'install'
+        version: 'latest'
         scanners: 'misconfig, secret, vuln'
         severities: 'CRITICAL'
         failOnSeverityThreshold: 'CRITICAL'
