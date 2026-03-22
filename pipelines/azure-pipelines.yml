@@ -1,0 +1,76 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- master
+
+pool:
+  name: 'Default' # Using a local agent running in Docker
+
+resources:
+- repo: self
+
+parameters:
+- name: deploy_to_aws
+  type: boolean
+  default: false
+- name: deploy_to_dockerhub
+  type: boolean
+  default: true
+
+variables: 
+- template: vars/common.yml
+- ${{ if eq(parameters.deploy_to_aws, true) }}:
+  - template: vars/aws-ecr.yml
+- ${{ if eq(parameters.deploy_to_dockerhub, true) }}:
+  - template: vars/dockerhub.yml
+
+stages:
+- stage: SecurityScan
+  displayName: Security Scan
+  jobs:
+  - job: TrivySecurityScan
+    displayName: Trivy Security Scan job
+    steps:
+    - task: trivy@2
+      inputs:
+        method: 'install'
+        version: 'latest'
+        type: 'filesystem'
+        target: '$(Build.SourcesDirectory)'
+        scanners: 'misconfig'
+        severities: 'CRITICAL'
+        failOnSeverityThreshold: 'CRITICAL'
+        reports: 'html'
+        publish: true
+
+- stage: BuildAndPush
+  displayName: Build And Push image
+  jobs:
+  - job: BuildAndPushJob
+    displayName: Build and Push image job
+    steps:
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        command: build
+        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        tags: |
+          $(tag)
+
+    # Push to AWS
+    - ${{ if eq(parameters.deploy_to_aws, true) }}:
+      - template: templates/docker-push.yml
+        parameters:
+          serviceConnection: $(aws_connection) # Defined in vars/aws-ecr.yml
+          repositoryName: $(aws_repo)          # Defined in vars/aws-ecr.yml
+
+    # Push to DockerHub
+    - ${{ if eq(parameters.deploy_to_dockerhub, true) }}:
+      - template: templates/docker-push.yml
+        parameters:
+          serviceConnection: $(dh_connection) # Defined in vars/dockerhub.yml
+          repositoryName: $(dh_repository)    # Defined in vars/dockerhub.yml
+          imageTag: '$(tag)'                  # Defined in vars/common.yml
+    
