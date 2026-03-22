@@ -19,7 +19,7 @@ steps:
 
 - bash: |
     # Extract digest from Docker@2 task output
-    DIGEST=$(echo "$(Docker.ImageDigest)")
+    DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${{ parameters.repositoryName }}:${{ parameters.imageTag }}")
     echo "Image Digest: $DIGEST"
     
     # Exporting the image digest as output variable
