@@ -60,3 +60,25 @@ stages:
         parameters:
           serviceConnection: $(aws_connection) # Defined in vars/aws-ecr.yml
           repositoryName: $(aws_repo)          # Defined in vars/aws-ecr.yml
+          imageTag: '$(tag)'
+
+- stage: Sign
+  displayName: Sign image with Cosign
+  dependsOn: BuildAndPush
+  jobs:
+  - job: SignImage
+    displayName: Cosign sign
+    steps:
+    # Sign the image pushed to DockerHub
+    - template: templates/cosign-sign.yml
+      parameters:
+        imageName: $(dh_repository) # Defined in vars/dockerhub.yml
+        tag: '$(tag)'               # Defined in vars/common.yml
+    
+    # Sign the image pushed to AWS
+    - ${{ if eq(parameters.deploy_to_aws, true) }}:
+      - template: templates/cosign-sign.yml
+        parameters:
+          imageName: $(aws_repo)          # Defined in vars/aws-ecr.yml
+          imageTag: '$(tag)'              # Defined in vars/common.yml
+        

@@ -1,0 +1,20 @@
+parameters:
+  - name: imageName
+    type: string
+  - name: tag
+    type: string
+
+steps:
+  - script: |
+    echo "$(COSIGN_PRIVATE_KEY)" > /tmp/cosign.key
+
+    cosign sign \
+      --key /tmp/cosign.key \
+      --yes \
+      ${{ parameters.imageName }}:${{ parameters.tag }}
+
+    rm /tmp/cosign.key
+
+  displayName: Sign container image
+  env:
+    COSIGN_PASSWORD: $(COSIGN_PASSWORD)
