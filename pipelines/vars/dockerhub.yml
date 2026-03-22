@@ -1,4 +1,6 @@
 variables:
-  - group: 'DockerHub-variables' # Group name for DockerHub variables
-  dh_connection: 'SC_DockerHub'
-  dh_repository: $(DOCKERHUB_REPOSITORY) # Set in pipeline variables
+  - group: 'DockerHub-variables'
+  - name: dh_connection
+    value: 'SC_DockerHub'
+  - name: dh_repository
+    value: $(DOCKERHUB_REPOSITORY)
