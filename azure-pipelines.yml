@@ -15,6 +15,29 @@ variables:
   tag: '$(Build.BuildId)'
 
 stages:
+- stage: SecurityScan
+  displayName: Security Scan
+  jobs:
+  - job: OwaspDependencyCheck
+    displayName: OWASP Dependency Check job
+    steps:
+    - task: Maven@4
+      displayName: Run OWASP Dependency Check
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'dependency-check:check'
+        options: >
+          -Ddependency-check.failBuildOnCVSS=7
+          -Ddependency-check.format=HTML
+          -Ddependency-check.outputDirectory=$(Build.ArtifactStagingDirectory)/dependency-check
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Dependency Check Report
+      condition: always()  # publicar el informe aunque el pipeline falle
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/dependency-check'
+        ArtifactName: 'dependency-check-report'
+
 - stage: Build
   displayName: Build image
   jobs:
