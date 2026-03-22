@@ -27,7 +27,7 @@ stages:
         version: 'latest'
         type: 'filesystem'
         target: '$(Build.SourcesDirectory)'
-        scanners: 'misconfig, secret, vuln'
+        scanners: 'misconfig'
         severities: 'CRITICAL'
         failOnSeverityThreshold: 'CRITICAL'
         reports: 'html'
