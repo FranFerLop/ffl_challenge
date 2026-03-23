@@ -1,0 +1,199 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- master
+
+pool:
+  name: 'Default' # Using a local agent running in Docker
+
+resources:
+- repo: self
+
+variables:
+  - group: 'AWS-ECR-variables' # Using Variable group to store AWS related variables
+  - group: 'Cosign-variables'   # Using Variable group to store Cosign related variables
+  - group: 'EKS-variables'      # Using Variable group to store EKS related variables
+  - name: aws_connection
+    value: '$(AWS_SERVICE_CONNECTION)'
+  - name: aws_ecr_registry
+    value: $(AWS_ECR_REGISTRY)
+  - name: aws_region
+    value: $(AWS_REGION)
+  - name: tag
+    value: '$(Build.BuildId)'
+  - name: app_name
+    value: 'simple-java-app'
+  - name: aws_repository
+    value: $(aws_ecr_registry)/$(app_name)
+  - name: image_uri
+    value: $(aws_repository):$(tag)
+  
+  # Cosign variables
+  - name: cosing_password
+    value: $(COSIGN_PASSWORD)
+  - name: cosign_private_key
+    value: $(COSIGN_PRIVATE_KEY)
+  - name: cosign_pub
+    value: |
+      -----BEGIN PUBLIC KEY-----
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAET66b8vNcTOQ/YXnMPeanivq+rpU3
+      vQsqyO9jj6K5GcR+tY9pvnmaYvu/vDVuyZNTgNJ5i0S4a2Ya8778RMXDcA==
+      -----END PUBLIC KEY-----
+  
+  # EKS variables
+  - name: kube_connection
+    value: $(EKS_SERVICE_CONNECTION)
+  - name: namespace_dev
+    value: $(K8S_NAMESPACE_DEV)
+  - name: namespace_staging
+    value: $(K8S_NAMESPACE_STAGING)
+  - name: namespace_prod
+    value: $(K8S_NAMESPACE_PROD)
+  - name: HELM_CHART_PATH
+    value: 'charts/springboot-app'
+
+stages:
+- stage: SecurityScan
+  displayName: Security Scan
+  jobs:
+  - job: TrivySecurityScan
+    displayName: Trivy Security Scan job
+    steps:
+    - task: trivy@2
+      inputs:
+        method: 'install'
+        version: 'latest'
+        type: 'filesystem'
+        target: '$(Build.SourcesDirectory)'
+        scanners: 'misconfig'
+        severities: 'CRITICAL'
+        failOnSeverityThreshold: 'CRITICAL'
+        reports: 'html'
+        publish: true
+
+- stage: BuildAndPush
+  displayName: Build And Push image
+  jobs:
+  - job: BuildAndPushJob
+    displayName: Build and Push image job
+    steps:
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        command: build
+        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        buildContext: '$(Build.SourcesDirectory)'
+        repository: $(image_uri)
+        
+    - script: |
+        # Export the image digest to be used in the Sign stage
+        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$(image_uri)")
+        
+        echo "Digest: $DIGEST"
+
+        echo "##vso[task.setvariable variable=imageDigest;isOutput=true]$DIGEST"
+      displayName: Extract image digest
+      name: extractDigest
+
+    - task: ECRPushImage@1
+      inputs:
+        awsCredentials: $(aws_connection)
+        regionName: $(aws_region)
+        imageSource: 'imagename'
+        sourceImageName: $(image_uri)
+        sourceImageTag: $(Build.BuildId)
+        pushTag: $(Build.BuildId)
+        repositoryName: $(app_name)
+
+- stage: Sign
+  displayName: Sign image with Cosign
+  dependsOn: BuildAndPush
+  jobs:
+  - job: SignImage
+    displayName: Cosign sign
+    steps:
+    - task: AWSShellScript@1
+      displayName: ECR Login for Cosign
+      inputs:
+        awsCredentials: $(aws_connection)
+        regionName: $(aws_region)
+        scriptType: inline
+        inlineScript: |
+          aws ecr get-login-password --region $(aws_region) | \
+            docker login --username AWS --password-stdin $(aws_ecr_registry)
+    # Sign the image pushed to DockerHub
+    - bash: |
+        cosign sign \
+          --key env://COSIGN_PRIVATE_KEY \
+          --yes \
+          $(aws_repository)@env://IMAGE_DIGEST
+      displayName: 'Sign container image with Cosign'
+      env:
+        COSIGN_PRIVATE_KEY: $(cosign_private_key)
+        COSIGN_PASSWORD: $(cosign_password)
+        IMAGE_DIGEST: "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+
+- stage: DeployDev
+  displayName: 'Deploy Dev'
+  dependsOn: BuildAndPush
+  condition: succeeded()
+  jobs:
+  - deployment: Deploy
+    environment: 'Dev'
+    strategy:
+      runOnce:
+        deploy:
+          steps:    
+          - template: templates/verify-and-deploy.yml
+            parameters:
+              environment:    "dev"
+              namespace:      $(namespace_dev)
+              kubeConnection: $(kube_connection)
+              imageTag:       $(image_uri)
+              imageDigest:    "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+              helmValues:     "charts/springboot-app/env/dev-values.yaml"
+              awsRepository:  $(aws_repository)
+
+- stage: DeployStaging
+  displayName: 'Deploy Staging'
+  dependsOn: DeployDev
+  condition: succeeded()
+  jobs:
+  - deployment: Deploy
+    environment: 'Staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:       
+          - template: templates/verify-and-deploy.yml
+            parameters:
+              environment:    "staging"
+              namespace:      $(namespace_staging)
+              kubeConnection: $(kube_connection)
+              imageTag:       $(image_uri)
+              imageDigest:    "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+              helmValues:     "charts/springboot-app/env/staging-values.yaml"
+              awsRepository:    $(aws_repository)
+
+- stage: DeployProd
+  displayName: 'Deploy Production'
+  dependsOn: DeployStaging
+  condition: succeeded()
+  jobs:
+  - deployment: Deploy
+    environment: 'Prod'
+    strategy:
+      runOnce:
+        deploy:
+          steps:       
+          - template: templates/verify-and-deploy.yml
+            parameters:
+              environment:    "prod"
+              namespace:      $(namespace_prod)
+              kubeConnection: $(kube_connection)
+              imageTag:       $(image_uri)
+              imageDigest:    "$[ stageDependencies.BuildAndPush.BuildAndPushJob.outputs['extractDigest.imageDigest'] ]"
+              helmValues:     "charts/springboot-app/env/prod-values.yaml"
+              awsRepository:    $(aws_repository)
