@@ -1,0 +1,50 @@
+parameters:
+  - name: environment
+    type: string
+  - name: namespace
+    type: string
+  - name: kubeConnection
+    type: string
+  - name: imageTag
+    type: string
+  - name: imageDigest
+    type: string
+  - name: helmValues
+    type: string
+
+steps:
+- task: AWSShellScript@1
+  displayName: ECR Login for Cosign
+  inputs:
+    awsCredentials: $(aws_connection)
+    regionName: $(aws_region)
+    scriptType: inline
+    inlineScript: |
+      aws ecr get-login-password --region $(aws_region) | \
+        docker login --username AWS --password-stdin $(aws_ecr_registry)
+# Verify the image pushed to DockerHub
+- script: |
+    cosign verify --key $(cosign_pub) "${{ parameters.imageTag }}"@"${{ parameters.imageDigest }}"
+  displayName: 'Cosign verify'
+
+- task: KubernetesManifest@1
+  displayName: "Set kube context (${{ parameters.environment }})"
+  inputs:
+    action:             "createSecret"    # creates namespace + sets context
+    kubernetesServiceConnection: "${{ parameters.kubeConnection }}"
+    namespace:          "${{ parameters.namespace }}"
+    secretType:         "generic"
+    secretName:         "pipeline-probe"  # harmless probe secret
+    secretArguments:    "--from-literal=probe=1"
+
+- script: |
+  helm upgrade --install springboot-dev $(HELM_CHART_PATH) \
+    -f "${{ paramenters.helmValues }}" \
+    --set image.repository="${{ parameters.awsRepository }}" \
+    --set image.tag=$(tag) \
+    --set image.digest="${{ parameters.imageDigest }}" \
+    --set environment="${{ parameters.environment }}" \
+    --atomic \
+    --wait \
+    --namespace "${{ parameters.namespace }}" --create-namespace
+displayName: 'Helm Upgrade / install'
